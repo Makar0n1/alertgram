@@ -14,7 +14,7 @@ async function start() {
   await consumer.run({
     eachMessage: async ({ message }) => {
       const email = JSON.parse(message.value);
-      const rules = await prisma.rule.findMany({ where: { userId: email.userId } });
+      const rules = await prisma.rule.findMany({ where: { projectId: email.projectId } });
       const matched = rules.some((rule) => email.subject.includes(rule.condition));
       if (matched) {
         await producer.send({

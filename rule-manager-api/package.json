@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "fastify": "^4.17.0",
+    "@prisma/client": "^5.0.0",
+    "imap": "^0.8.19",
+    "@fastify/cors": "^8.3.0",
+    "jsonwebtoken": "^9.0.0",
+    "bcrypt": "^5.0.1",
+    "node-telegram-bot-api": "^0.61.0",
+    "google-auth-library": "^9.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.0.0"
+  }
+}

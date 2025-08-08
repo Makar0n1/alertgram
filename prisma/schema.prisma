@@ -8,16 +8,45 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
+  id            String      @id @default(uuid())
+  persistentId  String      @unique
+  nickname      String?
+  email         String      @unique
+  password      String
+  telegramId    String?     @unique
   telegramToken String?
-  chatId        String?
+  projects      Project[]
+  authTokens    AuthToken[]
+}
+
+model Project {
+  id            String   @id @default(uuid())
+  userId        String
+  email         String
+  password      String?
+  host          String?  @default("imap.gmail.com")
+  port          Int?     @default(993)
+  accessToken   String?
+  refreshToken  String?
+  tokenExpiry   DateTime?
   rules         Rule[]
+  user          User     @relation(fields: [userId], references: [id])
 }
 
 model Rule {
-  id        String @id @default(uuid())
-  userId    String
+  id        String  @id @default(uuid())
+  projectId String
   condition String
-  user      User   @relation(fields: [userId], references: [id])
+  project   Project @relation(fields: [projectId], references: [id])
+}
+
+model AuthToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  userAgent String?
+  ipAddress String?
+  user      User     @relation(fields: [userId], references: [id])
 }

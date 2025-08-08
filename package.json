@@ -1,11 +1,13 @@
 {
   "dependencies": {
-    "imap": "^0.8.19",
-    "mailparser": "^3.6.4",
-    "kafkajs": "^2.2.4",
+    "@prisma/client": "^6.13.0",
     "fastify": "^4.17.0",
-    "@prisma/client": "^5.0.0",
-    "node-telegram-bot-api": "^0.61.0",
-    "prisma": "^5.0.0"
+    "imap": "^0.8.19",
+    "kafkajs": "^2.2.4",
+    "mailparser": "^3.6.4",
+    "node-telegram-bot-api": "^0.61.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.13.0"
   }
 }

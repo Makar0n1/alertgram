@@ -1,26 +1,54 @@
-version: '3.8'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_MAX_CLIENT_CNXNS: 60
+    ports:
+      - "2181:2181"
     volumes:
       - zookeeper-data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ["CMD-SHELL", "echo mntr | nc localhost 2181 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - app-network
+
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
+      - "29092:29092"
       - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    volumes:
-      - kafka-data:/var/lib/kafka/data
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: nc -z kafka 29092
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    mem_limit: 1g
+    networks:
+      - app-network
+
   postgres:
     image: postgres:15
     ports:
@@ -31,41 +59,119 @@ services:
       POSTGRES_DB: alerts
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - app-network
+
   email-ingestor:
-    build: ./email-ingestor
+    build:
+      context: .
+      dockerfile: email-ingestor/Dockerfile
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
     env_file:
       - ./email-ingestor/.env
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - app-network
+
   rule-manager-api:
-    build: ./rule-manager-api
+    build:
+      context: .
+      dockerfile: rule-manager-api/Dockerfile
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "3000:3000"
     env_file:
       - ./rule-manager-api/.env
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - app-network
+
   notification-processor:
-    build: ./notification-processor
+    build:
+      context: .
+      dockerfile: notification-processor/Dockerfile
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     env_file:
       - ./notification-processor/.env
-  telegram-sender:
-    build: ./telegram-sender
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - app-network
+
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
     depends_on:
-      - kafka
-      - postgres
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "3003:3003"
+    env_file:
+      - ./auth-service/.env
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - app-network
+
+  telegram-sender:
+    build:
+      context: .
+      dockerfile: telegram-sender/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     env_file:
       - ./telegram-sender/.env
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - app-network
+
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
     ports:
       - "3001:80"
     depends_on:
       - rule-manager-api
+    env_file:
+      - ./frontend/.env
+    restart: unless-stopped
+    mem_limit: 512m
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
 volumes:
   zookeeper-data:
   kafka-data:
